@@ -1,6 +1,6 @@
 'use client'
 import React, { useState } from 'react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { Calendar as CalendarIcon, Clock, GripVertical, Tag, Flag } from 'lucide-react'
 import { Draggable } from 'react-beautiful-dnd'
 import {
@@ -56,19 +56,27 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, index, onUpdate }) => 
     })
   }
 
+  const formatDate = (date: Date) => {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    return format(dateObj, 'MMM d');
+  };
+
   return (
     <Draggable draggableId={todo.id} index={index}>
-      {(provided) => (
+      {(provided, snapshot) => (
         <li
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100"
+          className={cn(
+            "flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100",
+            "transition-shadow duration-200",
+            snapshot.isDragging && "shadow-lg"
+          )}
           style={{
             ...provided.draggableProps.style,
-            left: 'auto',
-            top: 'auto',
-            position: (provided.draggableProps.style as any)?.position,
-            transform: provided.draggableProps.style?.transform,
+            transition: snapshot.isDragging 
+              ? provided.draggableProps.style?.transition 
+              : 'all 0.2s cubic-bezier(0.2, 0, 0, 1)'
           }}
         >
           <div className="flex items-center gap-3">
@@ -198,7 +206,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, index, onUpdate }) => 
                   className="flex items-center gap-1.5 px-2 py-0.5 h-auto text-xs text-gray-500 hover:bg-gray-50"
                 >
                   <CalendarIcon className="h-3 w-3 text-gray-400" />
-                  {format(new Date(todo.dueDate), 'MMM d')}
+                  {formatDate(todo.dueDate)}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -206,7 +214,9 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, index, onUpdate }) => 
                   selected={new Date(todo.dueDate)}
                   onSelect={(date) => {
                     if (date) {
-                      onUpdate({ dueDate: date })
+                      const newDate = new Date(date);
+                      newDate.setUTCHours(12, 0, 0, 0);
+                      onUpdate({ dueDate: newDate });
                     }
                   }}
                 />

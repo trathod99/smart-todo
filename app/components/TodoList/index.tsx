@@ -5,14 +5,14 @@ import { TodoForm } from './TodoForm'
 import { TodoItem } from './TodoItem'
 import { Sidebar } from '../Sidebar'
 import { Todo } from '../types'
-import { estimateDuration } from '../../utils/ai'
+import { parseTaskDetails } from '../../utils/ai'
 
 export function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
 
   const addTodo = async (title: string) => {
-    const newTodo: Todo = {
+    const tempTodo: Todo = {
       id: Date.now().toString(),
       title,
       dueDate: new Date(),
@@ -20,15 +20,24 @@ export function TodoList() {
       priority: 'P3',
       categories: [],
     }
-    setTodos(prevTodos => [newTodo, ...prevTodos])
+    setTodos(prevTodos => [tempTodo, ...prevTodos])
 
     try {
-      const estimatedDuration = await estimateDuration(title)
+      const details = await parseTaskDetails(title)
+      
       setTodos(prevTodos => prevTodos.map(todo =>
-        todo.id === newTodo.id ? { ...todo, duration: estimatedDuration } : todo
+        todo.id === tempTodo.id
+          ? {
+              ...todo,
+              title: details.title || todo.title,
+              dueDate: details.dueDate || todo.dueDate,
+              priority: details.priority || todo.priority,
+              duration: details.duration || todo.duration
+            }
+          : todo
       ))
     } catch (error) {
-      console.error('Failed to estimate duration:', error)
+      console.error('Failed to parse task details:', error)
     }
   }
 
@@ -74,16 +83,16 @@ export function TodoList() {
         onSelectFilter={setSelectedFilter}
       />
       
-      <div className="flex-1 p-8 bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100">
-        <div className="max-w-2xl mx-auto">
+      <div className="flex-1">
+        <div className="max-w-2xl mx-auto p-8 bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100">
           <TodoForm onSubmit={addTodo} />
           <DragDropContext onDragEnd={onDragEnd}>
-            <Droppable droppableId="todos-list" isDropDisabled={false}>
+            <Droppable droppableId="todos-list" direction="vertical">
               {(provided) => (
                 <ul
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  className="space-y-3 relative overflow-hidden"
+                  className="space-y-3 mt-4"
                 >
                   {filteredTodos.map((todo, index) => (
                     <TodoItem
