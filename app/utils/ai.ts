@@ -12,9 +12,10 @@ interface TaskDetails {
   dueDate?: Date;
   priority?: Priority;
   duration: string;
+  categories: string[];
 }
 
-export async function parseTaskDetails(input: string): Promise<TaskDetails> {
+export async function parseTaskDetails(input: string, existingCategories: string[] = []): Promise<TaskDetails> {
   try {
     const today = new Date();
     const message = await anthropic.messages.create({
@@ -23,17 +24,21 @@ export async function parseTaskDetails(input: string): Promise<TaskDetails> {
       messages: [{
         role: "user",
         content: `Parse the following todo task: "${input}"
+        
         Extract these details:
-        1. Due date (if mentioned explicitly or implicitly, like "tomorrow", "next week", "11/17", etc.)
-           - For relative dates like "tomorrow" or "next week", provide the actual date relative to today
-           - For explicit dates like "11/17", assume it's in the future (add a year if needed)
-           - Return dates in ISO format with time set to noon UTC to avoid timezone issues
-        2. Priority level (if mentioned explicitly like "p1" or implied by words like "urgent", "asap", "important")
-        3. Duration estimate (how long this task might take to complete, e.g., "15m", "1h", "2h", "4h", "3d", "6 months", etc.)
-           - Be realistic and consider the complexity of the task
-           - Use common duration formats: 10 min, 2 hr, 1 day, 6 months, 1 yr, etc. 
-           - Ranges are acceptable (e.g., "1-2d" is acceptable)
-        4. Clean title (original text with date/priority markers removed)
+        1. Due date (if mentioned explicitly or implicitly)
+        2. Priority level (if mentioned explicitly or implied)
+        3. Duration estimate (how long this task might take)
+            - Be realistic and consider the complexity of the task
+            - Use common duration formats: 10 min, 2 hr, 1 day, 6 months, 1 yr, etc. 
+            - Ranges are acceptable (e.g., "1-2d" is acceptable)
+            - if there is no reasonable duration estimate, return nothing
+        4. Categories (1-3 categories that best describe this task)
+           - Here are the existing categories: ${existingCategories.join(', ')}
+           - If the task fits an existing category, use that instead of creating a new one
+           - If no existing categories fit, suggest 1-3 new categories
+           - Categories should be single words or short phrases (e.g., "Fitness", "Home Maintenance")
+        5. Clean title (original text with date/priority markers removed)
 
         Today's date is: ${format(today, 'yyyy-MM-dd')}
 
@@ -42,15 +47,9 @@ export async function parseTaskDetails(input: string): Promise<TaskDetails> {
           "dueDate": "YYYY-MM-DDT12:00:00.000Z" or null,
           "priority": "P1" or "P2" or "P3" or "P4" or null,
           "duration": "duration string",
+          "categories": ["category1", "category2"],
           "cleanTitle": "cleaned text"
-        }
-
-        Examples of duration estimates:
-        - "quick shower" -> "15m"
-        - "write blog post" -> "2h"
-        - "clean apartment" -> "1.5h"
-        - "grocery shopping" -> "45m"
-        - "write a book" -> "1-2 years"`
+        }`
       }]
     });
 
@@ -84,13 +83,15 @@ export async function parseTaskDetails(input: string): Promise<TaskDetails> {
       title: parsed.cleanTitle,
       dueDate: dueDate,
       priority: parsed.priority as Priority | undefined,
-      duration: parsed.duration || '15m', // Ensure we always have a duration
+      duration: parsed.duration || '',
+      categories: parsed.categories || [],
     };
   } catch (error) {
     console.error('Error parsing task details:', error);
     return {
       title: input,
-      duration: '15m'
+      duration: '',
+      categories: [],
     };
   }
 } 

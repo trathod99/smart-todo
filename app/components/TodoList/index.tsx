@@ -16,14 +16,15 @@ export function TodoList() {
       id: Date.now().toString(),
       title,
       dueDate: new Date(),
-      duration: '15m',
-      priority: 'P3',
+      duration: '',
+      priority: 'P4',
       categories: [],
     }
     setTodos(prevTodos => [tempTodo, ...prevTodos])
 
     try {
-      const details = await parseTaskDetails(title)
+      const existingCategories = Array.from(new Set(todos.flatMap(todo => todo.categories)))
+      const details = await parseTaskDetails(title, existingCategories)
       
       setTodos(prevTodos => prevTodos.map(todo =>
         todo.id === tempTodo.id
@@ -31,8 +32,9 @@ export function TodoList() {
               ...todo,
               title: details.title || todo.title,
               dueDate: details.dueDate || todo.dueDate,
-              priority: details.priority || todo.priority,
-              duration: details.duration || todo.duration
+              priority: details.priority || 'P4',
+              duration: details.duration || '',
+              categories: details.categories
             }
           : todo
       ))
@@ -60,20 +62,30 @@ export function TodoList() {
   }
 
   const allCategories = useMemo(() => {
-    const categorySet = new Set<string>()
+    const categoryCount = new Map<string, number>()
     todos.forEach(todo => {
-      todo.categories.forEach(category => categorySet.add(category))
+      todo.categories.forEach(category => {
+        categoryCount.set(category, (categoryCount.get(category) || 0) + 1)
+      })
     })
-    return Array.from(categorySet)
+    
+    return Array.from(categoryCount.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
   }, [todos])
 
   const filteredTodos = useMemo(() => {
-    if (!selectedFilter) return todos
+    const priorityOrder = { P1: 0, P2: 1, P3: 2, P4: 3 };
+    const sortedTodos = [...todos].sort((a, b) => 
+      priorityOrder[a.priority] - priorityOrder[b.priority]
+    );
     
-    return todos.filter(todo => 
+    if (!selectedFilter) return sortedTodos;
+    
+    return sortedTodos.filter(todo => 
       todo.priority === selectedFilter || todo.categories.includes(selectedFilter)
-    )
-  }, [todos, selectedFilter])
+    );
+  }, [todos, selectedFilter]);
 
   return (
     <div className="max-w-5xl mx-auto mt-16 flex gap-8">
